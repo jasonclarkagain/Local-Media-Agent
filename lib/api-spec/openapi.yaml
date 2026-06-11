@@ -3,13 +3,26 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Echo — Local Autonomous Media Assistant API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: commands
+    description: Submit natural language commands to Echo
+  - name: jobs
+    description: Async orchestration jobs
+  - name: downloads
+    description: qBittorrent download management
+  - name: search
+    description: Torrent search via Prowlarr/Jackett
+  - name: settings
+    description: Service configuration
+  - name: stats
+    description: System statistics and status
+
 paths:
   /healthz:
     get:
@@ -24,6 +37,259 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /commands:
+    post:
+      operationId: submitCommand
+      tags: [commands]
+      summary: Submit a natural language command to Echo
+      description: >
+        Parses the intent, extracts entities, and dispatches an async job
+        to the appropriate media service pipeline.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommandInput"
+      responses:
+        "202":
+          description: Command accepted, job created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "400":
+          description: Invalid command
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /jobs:
+    get:
+      operationId: listJobs
+      tags: [jobs]
+      summary: List all orchestration jobs
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, running, completed, failed, cancelled]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: List of jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Job"
+
+  /jobs/{id}:
+    get:
+      operationId: getJob
+      tags: [jobs]
+      summary: Get a specific job with its log entries
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Job detail with logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobDetail"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: cancelJob
+      tags: [jobs]
+      summary: Cancel a running or pending job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Job cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /downloads:
+    get:
+      operationId: listDownloads
+      tags: [downloads]
+      summary: List active and recent downloads from qBittorrent
+      responses:
+        "200":
+          description: List of downloads
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Download"
+
+  /downloads/{hash}:
+    delete:
+      operationId: deleteDownload
+      tags: [downloads]
+      summary: Remove a download from qBittorrent (also deletes local files)
+      parameters:
+        - name: hash
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Download removed
+        "404":
+          description: Download not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /search:
+    post:
+      operationId: searchTorrents
+      tags: [search]
+      summary: Search for torrents via Prowlarr/Jackett
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TorrentSearchInput"
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TorrentResult"
+        "400":
+          description: Invalid search parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /torrents:
+    post:
+      operationId: addTorrent
+      tags: [search]
+      summary: Add a torrent magnet/URL to qBittorrent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TorrentAddInput"
+      responses:
+        "201":
+          description: Torrent added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Download"
+        "400":
+          description: Invalid torrent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get all service configuration settings
+      responses:
+        "200":
+          description: Current settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+    put:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update service configuration settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettingsInput"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+        "400":
+          description: Invalid settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /stats:
+    get:
+      operationId: getStats
+      tags: [stats]
+      summary: Get system-wide statistics
+      responses:
+        "200":
+          description: System statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemStats"
+
+  /services/status:
+    get:
+      operationId: getServicesStatus
+      tags: [stats]
+      summary: Check connectivity to all configured services
+      responses:
+        "200":
+          description: Service connectivity status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServicesStatus"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +300,326 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    CommandInput:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          minLength: 1
+          description: Natural language command (e.g. "Download everything The Rolling Stones ever did")
+
+    Job:
+      type: object
+      required: [id, command, status, intentType, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        command:
+          type: string
+          description: Original user command text
+        status:
+          type: string
+          enum: [pending, running, completed, failed, cancelled]
+        intentType:
+          type: ["string", "null"]
+          description: >
+            Parsed intent type: media_bulk_download, media_single_download,
+            search_query, status_check, manage_downloads, unknown
+        entities:
+          type: ["string", "null"]
+          description: JSON-encoded extracted entities (artist, media_type, scope, etc.)
+        progress:
+          type: ["integer", "null"]
+          description: Progress percentage 0-100
+        summary:
+          type: ["string", "null"]
+          description: Human-readable status summary
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    JobLog:
+      type: object
+      required: [id, jobId, level, message, createdAt]
+      properties:
+        id:
+          type: integer
+        jobId:
+          type: integer
+        level:
+          type: string
+          enum: [info, warn, error, debug]
+        message:
+          type: string
+        metadata:
+          type: ["string", "null"]
+          description: JSON-encoded extra data
+        createdAt:
+          type: string
+          format: date-time
+
+    JobDetail:
+      type: object
+      required: [id, command, status, intentType, createdAt, updatedAt, logs]
+      properties:
+        id:
+          type: integer
+        command:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, failed, cancelled]
+        intentType:
+          type: ["string", "null"]
+        entities:
+          type: ["string", "null"]
+        progress:
+          type: ["integer", "null"]
+        summary:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/JobLog"
+
+    Download:
+      type: object
+      required: [hash, name, state, progress, size, downloadedBytes, uploadSpeed, downloadSpeed, eta, category]
+      properties:
+        hash:
+          type: string
+        name:
+          type: string
+        state:
+          type: string
+          description: >
+            qBittorrent torrent state: downloading, uploading, pausedDL, pausedUP,
+            stalledDL, stalledUP, checkingDL, checkingUP, error, missingFiles, queued, moving, unknown
+        progress:
+          type: number
+          description: Progress 0.0 to 1.0
+        size:
+          type: integer
+          description: Total size in bytes
+        downloadedBytes:
+          type: integer
+        uploadSpeed:
+          type: integer
+          description: Upload speed in bytes/sec
+        downloadSpeed:
+          type: integer
+          description: Download speed in bytes/sec
+        eta:
+          type: integer
+          description: ETA in seconds (-1 if unknown)
+        category:
+          type: string
+        savePath:
+          type: ["string", "null"]
+        seeders:
+          type: ["integer", "null"]
+        leechers:
+          type: ["integer", "null"]
+        addedOn:
+          type: ["integer", "null"]
+          description: Unix timestamp when torrent was added
+
+    TorrentSearchInput:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 1
+        categories:
+          type: array
+          items:
+            type: string
+          description: "e.g. ['music', 'flac', 'mp3']"
+        minSeeders:
+          type: integer
+          default: 1
+        limit:
+          type: integer
+          default: 20
+
+    TorrentResult:
+      type: object
+      required: [title, indexer, seeders, leechers, size, publishDate]
+      properties:
+        title:
+          type: string
+        indexer:
+          type: string
+        seeders:
+          type: integer
+        leechers:
+          type: integer
+        size:
+          type: integer
+          description: Size in bytes
+        publishDate:
+          type: string
+          format: date-time
+        downloadUrl:
+          type: ["string", "null"]
+        magnetUrl:
+          type: ["string", "null"]
+        infoUrl:
+          type: ["string", "null"]
+        category:
+          type: ["string", "null"]
+
+    TorrentAddInput:
+      type: object
+      properties:
+        magnetUrl:
+          type: ["string", "null"]
+        torrentUrl:
+          type: ["string", "null"]
+        category:
+          type: string
+          default: echo-agent
+        savePath:
+          type: ["string", "null"]
+        name:
+          type: ["string", "null"]
+
+    Settings:
+      type: object
+      required: [id, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        qbittorrentUrl:
+          type: ["string", "null"]
+          description: "e.g. http://localhost:8080"
+        qbittorrentUsername:
+          type: ["string", "null"]
+        qbittorrentPassword:
+          type: ["string", "null"]
+        prowlarrUrl:
+          type: ["string", "null"]
+          description: "e.g. http://localhost:9696"
+        prowlarrApiKey:
+          type: ["string", "null"]
+        lidarrUrl:
+          type: ["string", "null"]
+        lidarrApiKey:
+          type: ["string", "null"]
+        radarrUrl:
+          type: ["string", "null"]
+        radarrApiKey:
+          type: ["string", "null"]
+        sonarrUrl:
+          type: ["string", "null"]
+        sonarrApiKey:
+          type: ["string", "null"]
+        ollamaUrl:
+          type: ["string", "null"]
+          description: "e.g. http://localhost:11434"
+        ollamaModel:
+          type: ["string", "null"]
+          description: "e.g. llama3:8b"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    SettingsInput:
+      type: object
+      properties:
+        qbittorrentUrl:
+          type: ["string", "null"]
+        qbittorrentUsername:
+          type: ["string", "null"]
+        qbittorrentPassword:
+          type: ["string", "null"]
+        prowlarrUrl:
+          type: ["string", "null"]
+        prowlarrApiKey:
+          type: ["string", "null"]
+        lidarrUrl:
+          type: ["string", "null"]
+        lidarrApiKey:
+          type: ["string", "null"]
+        radarrUrl:
+          type: ["string", "null"]
+        radarrApiKey:
+          type: ["string", "null"]
+        sonarrUrl:
+          type: ["string", "null"]
+        sonarrApiKey:
+          type: ["string", "null"]
+        ollamaUrl:
+          type: ["string", "null"]
+        ollamaModel:
+          type: ["string", "null"]
+
+    SystemStats:
+      type: object
+      required: [totalJobs, pendingJobs, runningJobs, completedJobs, failedJobs, totalDownloads, activeDownloads]
+      properties:
+        totalJobs:
+          type: integer
+        pendingJobs:
+          type: integer
+        runningJobs:
+          type: integer
+        completedJobs:
+          type: integer
+        failedJobs:
+          type: integer
+        totalDownloads:
+          type: integer
+        activeDownloads:
+          type: integer
+        totalDownloadedBytes:
+          type: integer
+        recentJobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Job"
+
+    ServiceStatusEntry:
+      type: object
+      required: [name, configured, reachable]
+      properties:
+        name:
+          type: string
+        configured:
+          type: boolean
+        reachable:
+          type: boolean
+        version:
+          type: ["string", "null"]
+        error:
+          type: ["string", "null"]
+
+    ServicesStatus:
+      type: object
+      required: [services]
+      properties:
+        services:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServiceStatusEntry"

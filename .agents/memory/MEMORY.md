@@ -1,0 +1,1 @@
+- [Orval Params collision on DELETE with query params](orval-params-collision.md) — DELETE endpoints with both path+query params cause TS2308; drop the query param or rename the operationId.

@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Echo — Local Media Assistant"
+version = "1.0.0"
+id = "artifacts/echo-ui"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22705
+
+[services.development]
+run = "pnpm --filter @workspace/echo-ui run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/echo-ui", "run", "build" ]
+publicDir = "artifacts/echo-ui/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22705"
+BASE_PATH = "/"
